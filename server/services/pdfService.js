@@ -61,7 +61,8 @@ class PDFService {
 
       // Calculate frequency and create topic objects
       const topicFrequency = {};
-      const words = natural.WordTokenizer().tokenize(text.toLowerCase());
+      const tokenizer = new natural.WordTokenizer();
+      const words = tokenizer.tokenize(text.toLowerCase());
       
       allTopics.forEach(topic => {
         const topicWords = topic.split(' ');

@@ -33,7 +33,7 @@ const questionSchema = new mongoose.Schema({
   },
   generatedBy: {
     type: String,
-    enum: ['ai', 'extracted', 'manual'],
+    enum: ['ai', 'ai-fallback', 'extracted', 'manual'],
     default: 'ai'
   },
   bloomLevel: {

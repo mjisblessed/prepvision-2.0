@@ -130,6 +130,11 @@ export const quizAPI = {
     return api.post(`/quiz/attempts/${attemptId}/answer`, answerData);
   },
 
+  // Submit quiz (simplified)
+  submitQuiz: (id, submissionData) => {
+    return api.post(`/quiz/${id}/submit`, submissionData);
+  },
+
   // Complete quiz
   completeQuiz: (attemptId) => {
     return api.post(`/quiz/attempts/${attemptId}/complete`);

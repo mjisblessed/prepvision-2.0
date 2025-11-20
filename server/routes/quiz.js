@@ -123,7 +123,17 @@ router.get('/', async (req, res) => {
  */
 router.get('/:id', async (req, res) => {
   try {
-    const quiz = await Quiz.findById(req.params.id)
+    const { id } = req.params;
+    
+    // Validate ObjectId format
+    if (!id || id === 'undefined' || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid quiz ID format'
+      });
+    }
+
+    const quiz = await Quiz.findById(id)
       .populate('questions.question');
     
     if (!quiz) {
@@ -140,6 +150,12 @@ router.get('/:id', async (req, res) => {
 
   } catch (error) {
     console.error('Get quiz error:', error);
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid quiz ID format'
+      });
+    }
     res.status(500).json({
       success: false,
       message: 'Failed to fetch quiz',
@@ -408,6 +424,101 @@ router.get('/attempts/:attemptId/results', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch results',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * Submit quiz (simplified version for frontend)
+ */
+router.post('/:id/submit', async (req, res) => {
+  try {
+    const { answers, completedAt, timeSpent } = req.body;
+    
+    const quiz = await Quiz.findById(req.params.id)
+      .populate('questions.question');
+    
+    if (!quiz) {
+      return res.status(404).json({
+        success: false,
+        message: 'Quiz not found'
+      });
+    }
+
+    // Calculate score
+    let correctAnswers = 0;
+    const detailedAnswers = [];
+
+    for (let i = 0; i < quiz.questions.length; i++) {
+      const question = quiz.questions[i].question;
+      const userAnswer = answers.find(a => a.questionId === question._id.toString());
+      
+      let isCorrect = false;
+      if (userAnswer && userAnswer.answer) {
+        if (question.questionType === 'multiple-choice') {
+          const correctOption = question.options?.find(opt => opt.isCorrect);
+          isCorrect = correctOption && correctOption.text === userAnswer.answer;
+        } else if (question.questionType === 'true-false') {
+          isCorrect = question.correctAnswer?.toLowerCase() === userAnswer.answer.toLowerCase();
+        } else {
+          // Short answer - basic text comparison (can be enhanced)
+          isCorrect = question.correctAnswer?.toLowerCase().trim() === userAnswer.answer.toLowerCase().trim();
+        }
+      }
+
+      if (isCorrect) correctAnswers++;
+
+      detailedAnswers.push({
+        questionId: question._id,
+        question: question.questionText,
+        userAnswer: userAnswer?.answer || '',
+        correctAnswer: quiz.settings?.showCorrectAnswers ? question.correctAnswer : undefined,
+        isCorrect,
+        points: isCorrect ? 1 : 0
+      });
+    }
+
+    const totalQuestions = quiz.questions.length;
+    const score = Math.round((correctAnswers / totalQuestions) * 100);
+    const passed = score >= (quiz.settings?.passingScore || 70);
+
+    // Update quiz statistics
+    quiz.totalAttempts += 1;
+    quiz.averageScore = ((quiz.averageScore * (quiz.totalAttempts - 1)) + score) / quiz.totalAttempts;
+    await quiz.save();
+
+    // Update question statistics
+    for (const answer of detailedAnswers) {
+      const question = await Question.findById(answer.questionId);
+      if (question) {
+        question.performance.totalAttempts += 1;
+        if (answer.isCorrect) {
+          question.performance.correctAnswers += 1;
+        }
+        question.usageCount += 1;
+        await question.save();
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Quiz submitted successfully',
+      data: {
+        score,
+        correctAnswers,
+        totalQuestions,
+        passed,
+        timeSpent,
+        answers: detailedAnswers
+      }
+    });
+
+  } catch (error) {
+    console.error('Submit quiz error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to submit quiz',
       error: error.message
     });
   }

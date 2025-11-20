@@ -18,15 +18,17 @@ import {
   Psychology as FlashcardIcon,
   TrendingUp as TrendingIcon,
   Analytics as AnalyticsIcon,
+  PlayArrow as PlayIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { analyticsAPI } from '../services/api';
+import { analyticsAPI, quizAPI } from '../services/api';
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [dashboardData, setDashboardData] = useState(null);
+  const [availableQuizzes, setAvailableQuizzes] = useState([]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -35,8 +37,12 @@ const Dashboard = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const response = await analyticsAPI.getDashboard();
-      setDashboardData(response.data);
+      const [dashboardResponse, quizzesResponse] = await Promise.all([
+        analyticsAPI.getDashboard(),
+        quizAPI.getQuizzes({ limit: 5 })
+      ]);
+      setDashboardData(dashboardResponse.data);
+      setAvailableQuizzes(quizzesResponse.data?.quizzes || []);
     } catch (err) {
       setError('Failed to load dashboard data');
       console.error('Dashboard error:', err);
@@ -274,6 +280,50 @@ const Dashboard = () => {
               </Card>
             </Grid>
           </Grid>
+
+          {/* Available Quizzes Section */}
+          {availableQuizzes.length > 0 && (
+            <>
+              <Typography variant="h5" component="h2" sx={{ mt: 4, mb: 3, fontWeight: 'bold' }}>
+                Available Quizzes
+              </Typography>
+              <Grid container spacing={3}>
+                {availableQuizzes.map((quiz) => (
+                  <Grid item xs={12} sm={6} md={4} key={quiz._id}>
+                    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                      <CardContent sx={{ flexGrow: 1 }}>
+                        <Typography variant="h6" component="h3" sx={{ mb: 1, fontWeight: 600 }}>
+                          {quiz.title}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                          {quiz.description || 'No description available'}
+                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+                          <Chip label={quiz.subject} size="small" color="primary" variant="outlined" />
+                          <Chip label={`${quiz.questions?.length || 0} questions`} size="small" variant="outlined" />
+                          {quiz.settings?.timeLimit && (
+                            <Chip label={`${quiz.settings.timeLimit} min`} size="small" variant="outlined" />
+                          )}
+                        </Box>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                          Average Score: {Math.round(quiz.averageScore || 0)}% • {quiz.totalAttempts || 0} attempts
+                        </Typography>
+                        <Button
+                          variant="contained"
+                          fullWidth
+                          startIcon={<PlayIcon />}
+                          onClick={() => navigate(`/quiz/${quiz._id}`)}
+                          sx={{ mt: 'auto' }}
+                        >
+                          Take Quiz
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+            </>
+          )}
         </>
       )}
     </Container>

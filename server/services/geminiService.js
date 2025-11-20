@@ -3,7 +3,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 class GeminiService {
   constructor() {
     this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    this.model = this.genAI.getGenerativeModel({ model: "gemini-pro" });
+    this.model = this.genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
   }
 
   /**
@@ -19,7 +19,7 @@ class GeminiService {
       const topicList = topics.map(t => t.name).join(', ');
       
       const prompt = `
-        Analyze the following academic content and generate ${questionCount} diverse educational questions.
+        Analyze the following academic content and generate ${questionCount} diverse, high-quality educational questions suitable for exam preparation.
         
         Subject: ${subject}
         Main Topics: ${topicList}
@@ -31,7 +31,7 @@ class GeminiService {
         {
           "questions": [
             {
-              "questionText": "Question text here?",
+              "questionText": "A well-phrased question?",
               "questionType": "multiple-choice|true-false|short-answer|essay|fill-blank",
               "options": [
                 {"text": "Option A", "isCorrect": false},
@@ -39,8 +39,8 @@ class GeminiService {
                 {"text": "Option C", "isCorrect": false},
                 {"text": "Option D", "isCorrect": false}
               ],
-              "correctAnswer": "For non-MCQ questions",
-              "explanation": "Detailed explanation of the answer",
+              "correctAnswer": "For non-MCQ questions, provide the precise answer.",
+              "explanation": "A detailed explanation of why the answer is correct, referencing concepts from the text.",
               "difficulty": "easy|medium|hard",
               "topics": ["topic1", "topic2"],
               "keywords": ["keyword1", "keyword2"],
@@ -50,15 +50,18 @@ class GeminiService {
           ]
         }
         
-        Requirements:
-        - Generate questions of different types (40% multiple-choice, 20% true-false, 20% short-answer, 15% fill-blank, 5% essay)
-        - Include questions of varying difficulty levels (30% easy, 50% medium, 20% hard)
-        - Cover different Bloom's taxonomy levels
-        - Ensure questions are clear, specific, and academically sound
-        - For multiple-choice questions, provide 4 options with only one correct answer
-        - Include detailed explanations for all answers
-        - Focus on key concepts and important topics from the content
-        - Make questions predictive of exam-style questions for this subject
+        **Crucial Requirements:**
+        1.  **Diverse Question Phrasing:** Do NOT just ask "What is...". Use varied formats like:
+            *   "Compare and contrast..."
+            *   "Explain the significance of..."
+            *   "What would happen if..."
+            *   "Describe the process of..."
+            *   "Analyze the relationship between..."
+        2.  **Question Type Distribution:** Generate a mix of question types (40% multiple-choice, 20% true-false, 20% short-answer, 15% fill-blank, 5% essay).
+        3.  **Difficulty & Cognitive Level:** Include a range of difficulties (30% easy, 50% medium, 20% hard) and cover different Bloom's Taxonomy levels.
+        4.  **Clarity and Relevance:** Questions must be clear, specific, and directly relevant to the provided content. They should be predictive of exam-style questions for this subject.
+        5.  **MCQ Integrity:** For multiple-choice questions, provide 4 distinct options with only one correct answer. Distractors should be plausible but incorrect.
+        6.  **Explanations:** Provide detailed explanations for all answers.
         
         Generate exactly ${questionCount} questions and return only the JSON response.
       `;
@@ -100,36 +103,38 @@ class GeminiService {
       const topicList = topics.map(t => t.name).join(', ');
       
       const prompt = `
-        Create ${cardCount} educational flashcards from the following content.
-        
-        Subject: ${subject}
-        Key Topics: ${topicList}
-        
-        Content:
-        ${text.substring(0, 3000)}
-        
-        Generate flashcards in this JSON format:
+        Based on the following text, generate ${cardCount} flashcards. Each flashcard should have a "front" with a clear, concise question and a "back" with the corresponding answer.
+
+        Text:
+        ${text.substring(0, 4000)}
+
+        Format the output as a JSON object with a "flashcards" array:
         {
           "flashcards": [
             {
-              "front": "Question or concept",
-              "back": "Answer or explanation",
-              "difficulty": "easy|medium|hard",
-              "topics": ["topic1", "topic2"],
-              "tags": ["tag1", "tag2"]
+              "front": "What is the capital of France?",
+              "back": "Paris",
+              "difficulty": "easy",
+              "topics": ["Geography"],
+              "tags": ["Europe"]
+            },
+            {
+              "front": "What is the formula for water?",
+              "back": "H2O",
+              "difficulty": "easy",
+              "topics": ["Chemistry"],
+              "tags": ["Compounds"]
             }
           ]
         }
-        
-        Requirements:
-        - Create clear, concise front-side questions or prompts
-        - Provide comprehensive but concise back-side answers
-        - Include definition cards, concept cards, and application cards
-        - Cover key terms, formulas, processes, and important facts
-        - Vary difficulty levels appropriately
-        - Make cards suitable for spaced repetition learning
-        
-        Return only the JSON response with exactly ${cardCount} flashcards.
+
+        **Crucial Requirements:**
+        1.  **Front:** Must be a specific question that can be answered from the text.
+        2.  **Back:** Must be the concise and accurate answer to the question on the front.
+        3.  **Relevance:** All flashcards must be directly based on the provided text.
+        4.  **Metadata:** Include difficulty, topics, and tags for each card.
+
+        Generate exactly ${cardCount} flashcards and return only the JSON response.
       `;
 
       const result = await this.model.generateContent(prompt);
@@ -292,16 +297,16 @@ class GeminiService {
     for (let i = 0; i < Math.min(count, sentences.length); i++) {
       const sentence = sentences[i].trim();
       questions.push({
-        questionText: `What is the main concept discussed in: "${sentence.substring(0, 100)}..."?`,
+        questionText: `Based on the text, what is the significance of the following point: "${sentence.substring(0, 100)}..."?`,
         questionType: 'short-answer',
         options: [],
-        correctAnswer: 'Answer based on the provided context',
-        explanation: 'This question tests comprehension of the given content.',
+        correctAnswer: 'The answer should be derived from the provided sentence in context.',
+        explanation: 'This is a fallback question. It tests basic comprehension of the source material when the primary AI model fails.',
         difficulty: 'medium',
         subject: subject,
         topics: topics.slice(0, 2).map(t => t.name),
         keywords: [],
-        generatedBy: 'ai',
+        generatedBy: 'ai-fallback',
         bloomLevel: 'understand',
         estimatedTime: 3
       });
@@ -317,12 +322,12 @@ class GeminiService {
     for (let i = 0; i < Math.min(count, sentences.length); i++) {
       const sentence = sentences[i].trim();
       flashcards.push({
-        front: `What does this statement mean?`,
-        back: sentence.substring(0, 200),
+        front: `What is the key point of: "${sentence.substring(0, 70)}..."?`,
+        back: sentence,
         subject: subject,
         topics: topics.slice(0, 2).map(t => t.name),
         difficulty: 'medium',
-        tags: ['concept', 'definition']
+        tags: ['fallback', 'comprehension']
       });
     }
     

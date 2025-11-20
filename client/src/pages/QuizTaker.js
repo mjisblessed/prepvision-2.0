@@ -35,7 +35,7 @@ import {
 import { quizAPI } from '../services/api';
 
 const QuizTaker = () => {
-  const { quizId } = useParams();
+  const { id: quizId } = useParams();
   const navigate = useNavigate();
   
   const [quiz, setQuiz] = useState(null);
@@ -53,6 +53,11 @@ const QuizTaker = () => {
   const [startTime, setStartTime] = useState(null);
 
   useEffect(() => {
+    if (!quizId || quizId === 'undefined') {
+      setError('Invalid quiz ID');
+      setLoading(false);
+      return;
+    }
     fetchQuiz();
   }, [quizId]);
 
@@ -80,6 +85,21 @@ const QuizTaker = () => {
       const response = await quizAPI.getQuiz(quizId);
       const quizData = response.data;
       
+      console.log('Fetched quiz data:', quizData); // Debug log
+      
+      // Transform the nested question structure to flat structure
+      if (quizData.questions && quizData.questions.length > 0) {
+        // Check if questions are nested (quiz.questions[].question) or flat
+        const firstQuestion = quizData.questions[0];
+        if (firstQuestion.question && typeof firstQuestion.question === 'object') {
+          // Transform nested structure to flat
+          quizData.questions = quizData.questions.map(item => ({
+            ...item.question,
+            points: item.points || 1
+          }));
+        }
+      }
+      
       // Randomize questions if setting is enabled
       if (quizData.settings?.randomizeQuestions) {
         quizData.questions = [...quizData.questions].sort(() => Math.random() - 0.5);
@@ -95,6 +115,7 @@ const QuizTaker = () => {
         }));
       }
 
+      console.log('Processed quiz data:', quizData); // Debug log
       setQuiz(quizData);
       if (quizData.settings?.timeLimit) {
         setTimeRemaining(quizData.settings.timeLimit * 60); // Convert to seconds
@@ -179,6 +200,10 @@ const QuizTaker = () => {
   const isLastQuestion = currentQuestionIndex === quiz?.questions.length - 1;
   const isFirstQuestion = currentQuestionIndex === 0;
 
+  // Debug log for current question
+  console.log('Current question:', currentQuestion);
+  console.log('Quiz questions length:', quiz?.questions?.length);
+
   if (loading) {
     return (
       <Container maxWidth="md">
@@ -204,6 +229,17 @@ const QuizTaker = () => {
       <Container maxWidth="md">
         <Alert severity="warning" sx={{ mt: 4 }}>
           Quiz not found
+        </Alert>
+      </Container>
+    );
+  }
+
+  // Check if quiz has questions
+  if (!quiz.questions || quiz.questions.length === 0) {
+    return (
+      <Container maxWidth="md">
+        <Alert severity="warning" sx={{ mt: 4 }}>
+          This quiz has no questions available.
         </Alert>
       </Container>
     );
@@ -400,14 +436,18 @@ const QuizTaker = () => {
                   value={answers[currentQuestion._id] || ''}
                   onChange={(e) => handleAnswerChange(currentQuestion._id, e.target.value)}
                 >
-                  {currentQuestion.options.map((option, index) => (
-                    <FormControlLabel
-                      key={index}
-                      value={option}
-                      control={<Radio />}
-                      label={option}
-                    />
-                  ))}
+                  {currentQuestion.options.map((option, index) => {
+                    // Handle both string options and object options
+                    const optionText = typeof option === 'string' ? option : option.text;
+                    return (
+                      <FormControlLabel
+                        key={index}
+                        value={optionText}
+                        control={<Radio />}
+                        label={optionText}
+                      />
+                    );
+                  })}
                 </RadioGroup>
               )}
 
