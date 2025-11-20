@@ -34,18 +34,6 @@ An AI-powered question paper analysis and quiz generation platform.
 
 See [detailed documentation](./README_DETAILED.md) for complete setup and usage instructions.
 
-## Environment Variables
-
-```env
-MONGODB_URI=mongodb://localhost:27017/prepvision
-GEMINI_API_KEY=your_gemini_api_key_here
-PORT=5000
-```
-
 ## Team
 
 Noor, Mithas, Namita, Rivea, Diya
-
-## License
-
-MIT License - see LICENSE file for details.
